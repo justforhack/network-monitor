@@ -59,8 +59,8 @@ func scanPorts(hosts []string) []string {
 	results := []string{}
 	ports := []int{80, 443, 8000, 8080, 8443}
 
-	for _, host := hosts {
-		for _, port := ports {
+	for _, host := range hosts {
+		for _, port := range ports {
 			address := fmt.Sprintf("%s:%d", host, port)
 			conn, err := net.Dial("tcp", address, 3000 * time.Millisecond)
 			if err != nil {
@@ -74,8 +74,8 @@ func scanPorts(hosts []string) []string {
 }
 
 func validateInsecure(hosts []string) {
-	for _, host := hosts {
-		if strings.HasPrefix(host, "443") {
+	for _, host := range hosts {
+		if string.HasPrefix(host, "443") {
 			continue
 		}
 
@@ -103,7 +103,7 @@ func inTimeSpan(start, end, check time.Time) bool {
 }
 
 func validateCert(hosts []string) {
-	for _, host := hosts {
+	for _, host := range hosts {
 		if !strings.HasPrefix(host, "443") {
 			continue
 		}
