@@ -15,8 +15,6 @@ import (
 	"github.com/OWASP/Amass/v3/datasrcs"
 	"github.com/OWASP/Amass/v3/enum"
 	"github.com/OWASP/Amass/v3/filter"
-	"github.com/OWASP/Amass/v3/format"
-	"github.com/OWASP/Amass/v3/requests"
 	"github.com/OWASP/Amass/v3/systems"
 )
 
