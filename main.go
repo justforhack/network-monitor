@@ -7,8 +7,8 @@ import (
 	"time"
 	"crypto/tls"
 	"net"
+	"net/http"
 	"strings"
-	"http"
 	"flag"
 
 	"github.com/OWASP/Amass/v3/config"
