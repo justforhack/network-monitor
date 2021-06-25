@@ -7,8 +7,8 @@ import (
 	"time"
 	"crypto/tls"
 	"net"
-	"net/http"
 	"strings"
+	"http"
 	"flag"
 
 	"github.com/OWASP/Amass/v3/config"
@@ -23,11 +23,11 @@ func main() {
 		domains := flag.String("domains", "", "Domains to scan network (separated by commas)")
 		flag.Parse()
 
-		if domains == "" {
+		if *domains == "" {
 			panic("Please provide domains to scan")
 		}
 
-		subdomains := amass(domains)
+		subdomains := amass(*domains)
 		live := scanPorts(subdomains)
 		validateInsecure(live)
 		validateCert(live)
@@ -56,7 +56,7 @@ func amass(domains string) []string {
 	}
 	defer e.Close()
 
-	ctx, _ := context.Background()
+	ctx := context.Background()
 	e.Start(ctx)
 
 	return e.ExtractOutput(nil)
@@ -93,7 +93,7 @@ func validateInsecure(hosts []string) {
 		url := fmt.Sprintf("http://%s", host)
 		request := gorequest.New()
 		_, _, err := request.Get(url).
-			RedirectPolicy(func(req Request, via []*Request) error {
+			RedirectPolicy(func(req http.Request, via []*http.Request) error {
 				if req.URL.Scheme == "https" {
 					secureRedirect = true
 				}
@@ -139,14 +139,14 @@ func validateCert(hosts []string) {
 		if err != nil {
 			fmt.Println("%s: [Issue] No SSL certificate: %s", string(v), url)
 		}
-		err = conn.VerifyHostname(host)
-		if err != nil {
+		error = conn.VerifyHostname(host)
+		if error != nil {
 			fmt.Println("%s: [Issue] Hostname doesn't match SSL certificate: %s", string(v), url)
 		}
 
-		timenow := time.Now().Format(time.RFC822)
-		start := conn.ConnectionState().PeerCertificates[0].NotBefore.Format(time.RFC822)
-		expiry := conn.ConnectionState().PeerCertificates[0].NotAfter.Format(time.RFC822)
+		timenow := time.Parse(time.RFC822, time.Now().Format("2006-01-02 15:04:05 UTC"))
+		start := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotBefore.Format("2006-01-02 15:04:05 UTC"))
+		expiry := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotAfter.Format("2006-01-02 15:04:05 UTC"))
 
 		if !inTimeSpan(start, expiry, timenow) {
 			fmt.Println("%s: [Issue] SSL certificate expired: %s", string(v), url)
