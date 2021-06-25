@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -55,7 +56,9 @@ func amass(domains string) []string {
 	}
 	defer e.Close()
 
-	e.Start()
+	ctx, _ := context.Background()
+	e.Start(ctx)
+
 	return e.ExtractOutput(nil)
 }
 
