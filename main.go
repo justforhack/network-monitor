@@ -76,7 +76,7 @@ func scanPorts(hosts []string) []string {
 }
 
 func validateInsecure(hosts []string) {
-	v , _ := time.Now().Format(time.RFC3339)
+	v := time.Now().Format(time.RFC3339)
 
 	var secureRedirect bool = false
 
@@ -88,7 +88,7 @@ func validateInsecure(hosts []string) {
 		url := fmt.Sprintf("http://%s", host)
 		
 		client := &http.Client{
-			CheckRedirect: func(req http.Request, via []*http.Request) error {
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if req.URL.Scheme == "https" {
 					secureRedirect = true
 				}
@@ -115,7 +115,7 @@ func validateCert(hosts []string) {
 	var c *tls.Conn
 	var e error
 
-	v , _ := time.Now().Format(time.RFC3339)
+	v := time.Now().Format(time.RFC3339)
 	tlsConfig := http.DefaultTransport.(*http.Transport).TLSClientConfig
 	versions := map[uint16]string{
 		tls.VersionSSL30: "SSLv3",
@@ -145,7 +145,7 @@ func validateCert(hosts []string) {
 		}
 
 		if c.ConnectionState().Version != tls.VersionTLS12 {
-			ver := conn.ConnectionState().Version
+			ver := c.ConnectionState().Version
 			fmt.Println("%s %s - Server uses %s which is unsecure", string(v), host, versions[ver])
 		}
 
