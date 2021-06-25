@@ -6,7 +6,7 @@ import (
 	"time"
 	"crypto/tls"
 	"net"
-	"string"
+	"strings"
 	"flag"
 
 	"github.com/OWASP/Amass/v3/config"
@@ -21,7 +21,7 @@ func main() {
 		d := flag.String("domains", nil, "Domains to scan network (separated by commas)")
 		flag.Parse()
 
-		domains := string.Split(*d, ",")
+		domains := strings.Split(*d, ",")
 		subdomains := amass(domains)
 		live := scanPorts(subdomains)
 		validateInsecure(live)
@@ -75,7 +75,7 @@ func scanPorts(hosts []string) []string {
 
 func validateInsecure(hosts []string) {
 	for _, host := hosts {
-		if string.HasPrefix(host, "443") {
+		if strings.HasPrefix(host, "443") {
 			continue
 		}
 
@@ -104,7 +104,7 @@ func inTimeSpan(start, end, check time.Time) bool {
 
 func validateCert(hosts []string) {
 	for _, host := hosts {
-		if !string.HasPrefix(host, "443") {
+		if !strings.HasPrefix(host, "443") {
 			continue
 		}
 
