@@ -7,7 +7,6 @@ import (
 	"time"
 	"crypto/tls"
 	"net"
-	"net/http"
 	"strings"
 	"flag"
 
@@ -19,14 +18,14 @@ import (
 )
 
 func main() {
+	domains := flag.String("domains", "", "Domains to scan network (separated by commas)")
+	flag.Parse()
+
+	if *domains == "" {
+		panic("Please provide domains to scan")
+	}
+
 	for {
-		domains := flag.String("domains", "", "Domains to scan network (separated by commas)")
-		flag.Parse()
-
-		if *domains == "" {
-			panic("Please provide domains to scan")
-		}
-
 		subdomains := amass(*domains)
 		live := scanPorts(subdomains)
 		validateInsecure(live)
@@ -93,10 +92,11 @@ func validateInsecure(hosts []string) {
 		url := fmt.Sprintf("http://%s", host)
 		request := gorequest.New()
 		_, _, err := request.Get(url).
-			RedirectPolicy(func(req http.Request, via []*http.Request) error {
+			RedirectPolicy(func(req gorequest.Request, via []*gorequest.Request) error {
 				if req.URL.Scheme == "https" {
 					secureRedirect = true
 				}
+				return nil
 			}).
 			Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36").
 			End()
@@ -125,11 +125,11 @@ func validateCert(hosts []string) {
 
 		url := fmt.Sprintf("https://%s", host)
 		request := gorequest.New()
-		_, _, err := request.Get(url).
+		_, _, errors := request.Get(url).
 			Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36").
 			End()
 
-		if err != nil {
+		if errors != nil {
 			v , _ := time.Now().UTC().MarshalText()
 			fmt.Println("%s: [Info] Dead URL: %s", string(v), url)
 			continue
@@ -139,14 +139,14 @@ func validateCert(hosts []string) {
 		if err != nil {
 			fmt.Println("%s: [Issue] No SSL certificate: %s", string(v), url)
 		}
-		error = conn.VerifyHostname(host)
-		if error != nil {
+		err = conn.VerifyHostname(host)
+		if err != nil {
 			fmt.Println("%s: [Issue] Hostname doesn't match SSL certificate: %s", string(v), url)
 		}
 
-		timenow := time.Parse(time.RFC822, time.Now().Format("2006-01-02 15:04:05 UTC"))
-		start := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotBefore.Format("2006-01-02 15:04:05 UTC"))
-		expiry := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotAfter.Format("2006-01-02 15:04:05 UTC"))
+		timenow, _ := time.Parse(time.RFC822, time.Now().Format("2006-01-02 15:04:05 UTC"))
+		start, _ := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotBefore.Format("2006-01-02 15:04:05 UTC"))
+		expiry, _ := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotAfter.Format("2006-01-02 15:04:05 UTC"))
 
 		if !inTimeSpan(start, expiry, timenow) {
 			fmt.Println("%s: [Issue] SSL certificate expired: %s", string(v), url)
