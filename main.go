@@ -14,6 +14,7 @@ import (
 	"github.com/OWASP/Amass/v3/datasrcs"
 	"github.com/OWASP/Amass/v3/enum"
 	"github.com/OWASP/Amass/v3/systems"
+	"github.com/OWASP/Amass/v3/filter"
 )
 
 func main() {
@@ -56,7 +57,7 @@ func amass(domains string) []string {
 
 	e.Start(context.TODO())
 
-	return e.ExtractOutput(nil)
+	return ExtractOutput(e, filter.NewBloomFilter(1 << 22), true, o)
 }
 
 func scanPorts(hosts []string) []string {
