@@ -6,6 +6,7 @@ import (
 	"time"
 	"crypto/tls"
 	"net"
+	"net/http"
 	"strings"
 	"flag"
 
@@ -18,10 +19,13 @@ import (
 
 func main() {
 	for {
-		d := flag.String("domains", nil, "Domains to scan network (separated by commas)")
+		domains := flag.String("domains", "", "Domains to scan network (separated by commas)")
 		flag.Parse()
 
-		domains := strings.Split(*d, ",")
+		if domains == "" {
+			panic("Please provide domains to scan")
+		}
+
 		subdomains := amass(domains)
 		live := scanPorts(subdomains)
 		validateInsecure(live)
@@ -31,23 +35,23 @@ func main() {
 	}
 }
 
-func amass(domains []string) []string {
+func amass(domains string) []string {
 	// Seed the default pseudo-random number generator
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	// Setup the most basic amass configuration
 	cfg := config.NewConfig()
-	cfg.AddDomain("example.com")
+	cfg.AddDomain(domains)
 
 	sys, err := systems.NewLocalSystem(cfg)
 	if err != nil {
-		return
+		return []string{}
 	}
 	sys.SetDataSources(datasrcs.GetAllSources(sys))
 
 	e := enum.NewEnumeration(cfg, sys)
 	if e == nil {
-		return
+		return []string{}
 	}
 	defer e.Close()
 
@@ -62,7 +66,7 @@ func scanPorts(hosts []string) []string {
 	for _, host := range hosts {
 		for _, port := range ports {
 			address := fmt.Sprintf("%s:%d", host, port)
-			conn, err := net.Dial("tcp", address, 3000 * time.Millisecond)
+			conn, err := net.DialTimeout("tcp", address, 3000 * time.Millisecond)
 			if err != nil {
 				continue
 			}
@@ -74,8 +78,12 @@ func scanPorts(hosts []string) []string {
 }
 
 func validateInsecure(hosts []string) {
+	v , _ := time.Now().UTC().MarshalText()
+
+	var secureRedirect bool = false
+
 	for _, host := range hosts {
-		if string.HasPrefix(host, "443") {
+		if strings.HasPrefix(host, "443") {
 			continue
 		}
 
@@ -83,17 +91,19 @@ func validateInsecure(hosts []string) {
 		request := gorequest.New()
 		_, _, err := request.Get(url).
 			RedirectPolicy(func(req Request, via []*Request) error {
-				if req.URL.Scheme != "https" {
-					fmt.Println("%s: [Issue] Insecure URL: %s (should redirect to HTTPS)", string(v), url)
-					continue
+				if req.URL.Scheme == "https" {
+					secureRedirect = true
 				}
 			}).
 			Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36").
 			End()
 
 		if err != nil {
-			v , _ := time.Now().UTC().MarshalText()
 			fmt.Println("%s: [Info] Dead URL: %s", string(v), url)
+		}
+
+		if !secureRedirect {
+			fmt.Println("%s: [Issue] Insecure URL: %s (should redirect to HTTPS)", string(v), url)
 		}
 	}
 }
@@ -103,6 +113,8 @@ func inTimeSpan(start, end, check time.Time) bool {
 }
 
 func validateCert(hosts []string) {
+	v , _ := time.Now().UTC().MarshalText()
+
 	for _, host := range hosts {
 		if !strings.HasPrefix(host, "443") {
 			continue
