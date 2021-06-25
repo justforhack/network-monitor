@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 	"crypto/tls"
 	"net"
+	"net/http"
 	"strings"
 	"flag"
 
@@ -14,7 +14,6 @@ import (
 	"github.com/OWASP/Amass/v3/datasrcs"
 	"github.com/OWASP/Amass/v3/enum"
 	"github.com/OWASP/Amass/v3/systems"
-	"github.com/parnurzeal/gorequest"
 )
 
 func main() {
@@ -36,9 +35,6 @@ func main() {
 }
 
 func amass(domains string) []string {
-	// Seed the default pseudo-random number generator
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	// Setup the most basic amass configuration
 	cfg := config.NewConfig()
 	cfg.AddDomain(domains)
@@ -63,7 +59,7 @@ func amass(domains string) []string {
 
 func scanPorts(hosts []string) []string {
 	results := []string{}
-	ports := []int{80, 443, 8000, 8080, 8443}
+	ports := []int{80, 443, 8080, 8443}
 
 	for _, host := range hosts {
 		for _, port := range ports {
@@ -80,7 +76,7 @@ func scanPorts(hosts []string) []string {
 }
 
 func validateInsecure(hosts []string) {
-	v , _ := time.Now().UTC().MarshalText()
+	v , _ := time.Now().Format(time.RFC3339)
 
 	var secureRedirect bool = false
 
@@ -90,23 +86,23 @@ func validateInsecure(hosts []string) {
 		}
 
 		url := fmt.Sprintf("http://%s", host)
-		request := gorequest.New()
-		_, _, err := request.Get(url).
-			RedirectPolicy(func(req gorequest.Request, via []gorequest.Request) error {
+		
+		client := &http.Client{
+			CheckRedirect: func(req http.Request, via []*http.Request) error {
 				if req.URL.Scheme == "https" {
 					secureRedirect = true
 				}
 				return nil
-			}).
-			Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36").
-			End()
+			},
+		}
+		resp, err := client.Get(url)
 
 		if err != nil {
-			fmt.Println("%s: [Info] Dead URL: %s", string(v), url)
+			continue
 		}
 
 		if !secureRedirect {
-			fmt.Println("%s: [Issue] Insecure URL: %s (should redirect to HTTPS)", string(v), url)
+			fmt.Println("%s %s - Insecure HTTP protocol (should redirect to HTTPS)", string(v), host)
 		}
 	}
 }
@@ -116,7 +112,16 @@ func inTimeSpan(start, end, check time.Time) bool {
 }
 
 func validateCert(hosts []string) {
-	v , _ := time.Now().UTC().MarshalText()
+	var c *tls.Conn
+	var e error
+
+	v , _ := time.Now().Format(time.RFC3339)
+	tlsConfig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	versions := map[uint16]string{
+		tls.VersionSSL30: "SSLv3",
+		tls.VersionTLS10: "TLS 1.0",
+		tls.VersionTLS11: "TLS 1.1",
+	}
 
 	for _, host := range hosts {
 		if !strings.HasPrefix(host, "443") {
@@ -124,32 +129,44 @@ func validateCert(hosts []string) {
 		}
 
 		url := fmt.Sprintf("https://%s", host)
-		request := gorequest.New()
-		_, _, errors := request.Get(url).
-			Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36").
-			End()
 
-		if errors != nil {
-			v , _ := time.Now().UTC().MarshalText()
-			fmt.Println("%s: [Info] Dead URL: %s", string(v), url)
+		client := &http.Client{
+			Transport: &http.Transport{
+				DialTLS: func(network, addr string) (net.Conn, error) {
+					c, e = tls.Dial(network, addr, tlsConfig)
+					return c, e
+				},
+			},
+		}
+		resp, err := client.Get(url)
+
+		if err != nil {
 			continue
+		}
+
+		if c.ConnectionState().Version != tls.VersionTLS12 {
+			ver := conn.ConnectionState().Version
+			fmt.Println("%s %s - Server uses %s which is unsecure", string(v), host, versions[ver])
 		}
 
 		conn, err := tls.Dial("tcp", host, nil)
 		if err != nil {
-			fmt.Println("%s: [Issue] No SSL certificate: %s", string(v), url)
+			fmt.Println("%s %s - No SSL certificate", string(v), host)
 		}
 		err = conn.VerifyHostname(host)
 		if err != nil {
-			fmt.Println("%s: [Issue] Hostname doesn't match SSL certificate: %s", string(v), url)
+			fmt.Println("%s %s - Hostname doesn't match SSL certificate", string(v), host)
 		}
 
-		timenow, _ := time.Parse(time.RFC822, time.Now().Format("2006-01-02 15:04:05 UTC"))
-		start, _ := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotBefore.Format("2006-01-02 15:04:05 UTC"))
-		expiry, _ := time.Parse(time.RFC822, conn.ConnectionState().PeerCertificates[0].NotAfter.Format("2006-01-02 15:04:05 UTC"))
+		for _, cert := range conn.ConnectionState().PeerCertificates {
+			timenow, _ := time.Parse(time.RFC822, time.Now().Format("2006-01-02 15:04:05 UTC"))
+			start, _ := time.Parse(time.RFC822, cert.NotBefore.Format("2006-01-02 15:04:05 UTC"))
+			expiry, _ := time.Parse(time.RFC822, cert.NotAfter.Format("2006-01-02 15:04:05 UTC"))
 
-		if !inTimeSpan(start, expiry, timenow) {
-			fmt.Println("%s: [Issue] SSL certificate expired: %s", string(v), url)
+			if !inTimeSpan(start, expiry, timenow) {
+				fmt.Println("%s %s - SSL certificate expired", string(v), host)
+				break
+			}
 		}
 	}
 }
