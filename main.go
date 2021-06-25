@@ -92,7 +92,7 @@ func validateInsecure(hosts []string) {
 		url := fmt.Sprintf("http://%s", host)
 		request := gorequest.New()
 		_, _, err := request.Get(url).
-			RedirectPolicy(func(req gorequest.Request, via []*gorequest.Request) error {
+			RedirectPolicy(func(req gorequest.Request, via []gorequest.Request) error {
 				if req.URL.Scheme == "https" {
 					secureRedirect = true
 				}
