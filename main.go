@@ -35,9 +35,12 @@ func main() {
 }
 
 func amass(domains string) []string {
+	// Seed the default pseudo-random number generator
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	// Setup the most basic amass configuration
 	cfg := config.NewConfig()
-	cfg.AddDomain(domains)
+	cfg.AddDomains(strings.Split(domains, ","))
 
 	sys, err := systems.NewLocalSystem(cfg)
 	if err != nil {
@@ -51,8 +54,7 @@ func amass(domains string) []string {
 	}
 	defer e.Close()
 
-	ctx := context.Background()
-	e.Start(ctx)
+	e.Start(context.TODO())
 
 	return e.ExtractOutput(nil)
 }
