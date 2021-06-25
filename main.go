@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"crypto/tls"
+	"math/rand"
 	"net"
 	"net/http"
 	"strings"
@@ -41,7 +42,9 @@ func amass(domains string) []string {
 
 	// Setup the most basic amass configuration
 	cfg := config.NewConfig()
-	cfg.AddDomains(strings.Split(domains, ","))
+	for _, domain := range strings.Split(domains, ",") {
+		cfg.AddDomain(domain)
+	}
 
 	sys, err := systems.NewLocalSystem(cfg)
 	if err != nil {
