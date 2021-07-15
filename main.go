@@ -16,7 +16,6 @@ import (
 	"github.com/OWASP/Amass/v3/config"
 	"github.com/OWASP/Amass/v3/datasrcs"
 	"github.com/OWASP/Amass/v3/enum"
-	"github.com/OWASP/Amass/v3/filter"
 	"github.com/OWASP/Amass/v3/systems"
 )
 
@@ -30,7 +29,7 @@ func main() {
 
 	for {
 		subdomains := amass(*domains)
-		if !len(subdomains) {
+		if len(subdomains) == 0 {
 			fmt.Println("ERROR: Cannot perform subdomains enumeration")
 			return
 		}
@@ -66,7 +65,7 @@ func amass(domains string) []string {
 
 	e.Start(context.TODO())
 
-	homedir := os.UserHomeDir()
+	homedir, err := os.UserHomeDir()
 
 	db, err := ioutil.ReadFile(homedir + "/.config/amass/amass.txt")
 	if err != nil {
