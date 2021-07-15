@@ -24,12 +24,13 @@ func main() {
 	flag.Parse()
 
 	if *domains == "" {
-		panic("Please provide domains to scan")
+		fmt.Println("Please provide domains to scan")
+		return
 	}
 
 	subdomains := amass(*domains)
 	if len(subdomains) == 0 {
-	fmt.Println("ERROR: Cannot perform subdomains enumeration")
+		fmt.Println("ERROR: Cannot perform subdomains enumeration")
 		return
 	}
 
@@ -116,7 +117,7 @@ func validateInsecure(hosts []string) {
 		}
 
 		if !secureRedirect {
-			fmt.Println("%s %s - Insecure HTTP protocol (should redirect to HTTPS)", string(v), host)
+			fmt.Printf("%s %s - Insecure HTTP protocol (should redirect to HTTPS)", string(v), host)
 		}
 	}
 }
@@ -160,16 +161,16 @@ func validateCert(hosts []string) {
 
 		if c.ConnectionState().Version != tls.VersionTLS12 {
 			ver := c.ConnectionState().Version
-			fmt.Println("%s %s - Server uses %s which is unsecure", string(v), host, versions[ver])
+			fmt.Printf("%s %s - Server uses %s which is unsecure", string(v), host, versions[ver])
 		}
 
 		conn, err := tls.Dial("tcp", host, nil)
 		if err != nil {
-			fmt.Println("%s %s - No SSL certificate", string(v), host)
+			fmt.Printf("%s %s - No SSL certificate", string(v), host)
 		}
 		err = conn.VerifyHostname(host)
 		if err != nil {
-			fmt.Println("%s %s - Hostname doesn't match SSL certificate", string(v), host)
+			fmt.Printf("%s %s - Hostname doesn't match SSL certificate", string(v), host)
 		}
 
 		for _, cert := range conn.ConnectionState().PeerCertificates {
@@ -178,7 +179,7 @@ func validateCert(hosts []string) {
 			expiry, _ := time.Parse(time.RFC822, cert.NotAfter.Format("2006-01-02 15:04:05 UTC"))
 
 			if !inTimeSpan(start, expiry, timenow) {
-				fmt.Println("%s %s - SSL certificate expired", string(v), host)
+				fmt.Printf("%s %s - SSL certificate expired", string(v), host)
 				break
 			}
 		}
