@@ -27,18 +27,15 @@ func main() {
 		panic("Please provide domains to scan")
 	}
 
-	for {
-		subdomains := amass(*domains)
-		if len(subdomains) == 0 {
-			fmt.Println("ERROR: Cannot perform subdomains enumeration")
-			return
-		}
-		live := scanPorts(subdomains)
-		validateInsecure(live)
-		validateCert(live)
-
-		time.Sleep(20 * time.Minute)
+	subdomains := amass(*domains)
+	if len(subdomains) == 0 {
+	fmt.Println("ERROR: Cannot perform subdomains enumeration")
+		return
 	}
+
+	live := scanPorts(subdomains)
+	validateInsecure(live)
+	validateCert(live)
 }
 
 func amass(domains string) []string {
@@ -112,7 +109,7 @@ func validateInsecure(hosts []string) {
 				return nil
 			},
 		}
-		resp, err := client.Get(url)
+		_, err := client.Get(url)
 
 		if err != nil {
 			continue
@@ -155,7 +152,7 @@ func validateCert(hosts []string) {
 				},
 			},
 		}
-		resp, err := client.Get(url)
+		_, err := client.Get(url)
 
 		if err != nil {
 			continue
