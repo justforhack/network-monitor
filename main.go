@@ -2,14 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"time"
 	"crypto/tls"
+	"os"
+	"fmt"
+	"flag"
+	"time"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
-	"flag"
+	"io/ioutil"
 
 	"github.com/OWASP/Amass/v3/config"
 	"github.com/OWASP/Amass/v3/datasrcs"
@@ -28,6 +30,10 @@ func main() {
 
 	for {
 		subdomains := amass(*domains)
+		if !len(subdomains) {
+			fmt.Println("ERROR: Cannot perform subdomains enumeration")
+			return
+		}
 		live := scanPorts(subdomains)
 		validateInsecure(live)
 		validateCert(live)
@@ -60,7 +66,13 @@ func amass(domains string) []string {
 
 	e.Start(context.TODO())
 
-	return ExtractOutput(e, filter.NewBloomFilter(1 << 22), true, 0)
+	homedir := os.UserHomeDir()
+
+	db, err := ioutil.ReadFile(homedir + "/.config/amass/amass.txt")
+	if err != nil {
+		return []string{}
+	}
+	return strings.Split(string(db), "\n")
 }
 
 func scanPorts(hosts []string) []string {
